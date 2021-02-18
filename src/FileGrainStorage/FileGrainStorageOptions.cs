@@ -1,4 +1,4 @@
-﻿namespace GrainStorage
+﻿namespace OrleansBasics.GrainStorage.FileStorage
 {
     public class FileGrainStorageOptions
     {

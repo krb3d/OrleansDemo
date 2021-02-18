@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Overrides;
 
-namespace GrainStorage
+namespace OrleansBasics.GrainStorage.FileStorage
 {
     public static class FileGrainStorageFactory
     {

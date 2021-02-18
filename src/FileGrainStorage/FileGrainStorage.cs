@@ -10,7 +10,7 @@ using System.Threading;
 using Orleans.Serialization;
 using System.IO;
 
-namespace GrainStorage
+namespace OrleansBasics.GrainStorage.FileStorage
 {
     /// <remarks>
     /// https://dotnet.github.io/orleans/docs/tutorials_and_samples/custom_grain_storage.html

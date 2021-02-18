@@ -5,7 +5,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans;
 
-namespace GrainStorage
+namespace OrleansBasics.GrainStorage.FileStorage
 {
     public static class FileSiloBuilderExtensions
     {
@@ -37,6 +37,16 @@ namespace GrainStorage
                 .AddSingletonNamedService(
                     providerName,
                     (serviceProvider, name) => (ILifecycleParticipant<ISiloLifecycle>)serviceProvider.GetRequiredServiceByName<IGrainStorage>(name));
+
+            /*
+             var silo = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .AddFileGrainStorage("File", opts =>
+                {
+                    opts.RootDirectory = "C:/TestFiles";
+                })
+                .Build();
+            */
 
             return services;
         }
