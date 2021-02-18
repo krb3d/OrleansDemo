@@ -8,12 +8,7 @@ namespace OrleansBasics
 {
     public class Program
     {
-        static int Main(string[] args)
-        {
-            return RunMainAsync().Result;
-        }
-
-        private static async Task<int> RunMainAsync()
+        public static async Task<int> Main(string[] args)
         {
             try
             {
@@ -25,9 +20,9 @@ namespace OrleansBasics
 
                 return 0;
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Console.WriteLine($"\nException while trying to run client: {e.Message}");
+                Console.WriteLine($"\nException while trying to run client: {ex.Message}");
                 Console.WriteLine("Make sure the silo the client is trying to connect to is running.");
                 Console.WriteLine("\nPress any key to exit.");
                 Console.ReadKey();
@@ -37,8 +32,8 @@ namespace OrleansBasics
 
         private static async Task<IClusterClient> ConnectClient()
         {
-            IClusterClient client;
-            client = new ClientBuilder()
+
+            var builder = new ClientBuilder()
                 .UseLocalhostClustering()
                 .Configure<ClusterOptions>(options =>
                 {
@@ -46,10 +41,11 @@ namespace OrleansBasics
                     options.ServiceId = "OrleansBasics";
                 })
                 .ConfigureLogging(logging =>
-                    logging.AddConsole())
-                .Build();
-
+                    logging.AddConsole());
+            
+            IClusterClient client = builder.Build();
             await client.Connect();
+
             Console.WriteLine("Client successfully connected to silo host \n");
 
             return client;
@@ -58,7 +54,7 @@ namespace OrleansBasics
         private static async Task DoClientWork(IClusterClient client)
         {
             // example of calling grains from the initialized client
-            var friend = client.GetGrain<IHello>(0);
+            var friend = client.GetGrain<IHello>(primaryKey: 0);
             var response = await friend.SayHello("Good morning, HelloGrain!");
             Console.WriteLine($"\n\n{response}\n\n");
         }
