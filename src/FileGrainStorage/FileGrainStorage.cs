@@ -6,9 +6,15 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Newtonsoft.Json;
+using System.Threading;
+using Orleans.Serialization;
+using System.IO;
 
 namespace GrainStorage
 {
+    /// <remarks>
+    /// https://dotnet.github.io/orleans/docs/tutorials_and_samples/custom_grain_storage.html
+    /// </remarks>
     public class FileGrainStorage: IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string _storageName;
@@ -34,22 +40,99 @@ namespace GrainStorage
 
         public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            throw new NotImplementedException();
+            var fName = GetKeyString(grainType, grainReference);
+            var path = Path.Combine(_options.RootDirectory, fName);
+
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Exists)
+            {
+                if (fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+                {
+                    throw new InconsistentStateException(
+                        $"Version conflict (ClearState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.");
+                }
+
+                grainState.ETag = null;
+                grainState.State = Activator.CreateInstance(grainState.State.GetType());
+                fileInfo.Delete();
+            }
+
+            return Task.CompletedTask;
         }
 
-        public Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            throw new NotImplementedException();
+            var fName = GetKeyString(grainType, grainReference);
+            var path = Path.Combine(_options.RootDirectory, fName);
+
+            var fileInfo = new FileInfo(path);
+            if (!fileInfo.Exists)
+            {
+                grainState.State = Activator.CreateInstance(grainState.State.GetType());
+                return;
+            }
+
+            using (var stream = fileInfo.OpenText())
+            {
+                var storedData = await stream.ReadToEndAsync();
+                grainState.State = JsonConvert.DeserializeObject(storedData, _jsonSettings);
+            }
+
+            // We use the fileInfo.LastWriteTimeUtc as a ETag which will be used by other functions for inconsistency checks to prevent data loss.
+            grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
         }
 
-        public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
+        public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            throw new NotImplementedException();
+            var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
+
+            var fName = GetKeyString(grainType, grainReference);
+            var path = Path.Combine(_options.RootDirectory, fName);
+
+            var fileInfo = new FileInfo(path);
+
+            if (fileInfo.Exists && fileInfo.LastWriteTimeUtc.ToString() != grainState.ETag)
+            {
+                throw new InconsistentStateException(
+                    $"Version conflict (WriteState): ServiceId={_clusterOptions.ServiceId} ProviderName={_storageName} GrainType={grainType} GrainReference={grainReference.ToKeyString()}.");
+            }
+
+            using (var stream = new StreamWriter(fileInfo.Open(FileMode.Create, FileAccess.Write)))
+            {
+                await stream.WriteAsync(storedData);
+            }
+
+            fileInfo.Refresh();
+            grainState.ETag = fileInfo.LastWriteTimeUtc.ToString();
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            throw new NotImplementedException();
+            var toDispose = lifecycle.Subscribe(
+                                observerName: OptionFormattingUtilities.Name<FileGrainStorage>(_storageName),
+                                stage: ServiceLifecycleStage.ApplicationServices,
+                                onStart: Init);
+        }
+
+        private Task Init(CancellationToken ct)
+        {
+            // Settings could be made configurable from Options.
+            _jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
+                                settings: OrleansJsonSerializer.GetDefaultSerializerSettings(_typeResolver, _grainFactory),
+                                useFullAssemblyNames: false,
+                                indentJson: false,
+                                typeNameHandling: null);
+
+            var directory = new System.IO.DirectoryInfo(_options.RootDirectory);
+            if (!directory.Exists)
+                directory.Create();
+
+            return Task.CompletedTask;
+        }
+
+        private string GetKeyString(string grainType, GrainReference grainReference)
+        {
+            return $"{_clusterOptions.ServiceId}.{grainReference.ToKeyString()}.{grainType}";
         }
     }
 }
