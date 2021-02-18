@@ -4,6 +4,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using System;
 using System.Threading.Tasks;
+using OrleansBasics.GrainStorage.FileStorage;
 
 namespace OrleansBasics
 {
@@ -43,6 +44,13 @@ namespace OrleansBasics
                     options.ClusterId = "dev";
                     options.ServiceId = "OrleansBasics";
                 })
+                .AddFileGrainStorage(
+                    "File",
+                    opts =>
+                    {
+                        opts.RootDirectory = "C:/TestFiles";
+                    }
+                )
                 .ConfigureApplicationParts(parts => 
                     parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
                 .ConfigureLogging(logging =>
