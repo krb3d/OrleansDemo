@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
+using Orleans.Providers;
 using System.Threading.Tasks;
 
 namespace OrleansBasics
 {
+    [StorageProvider(ProviderName = "File")]
     public class HelloGrain : Orleans.Grain, IHello
     {
         private readonly ILogger _logger;
